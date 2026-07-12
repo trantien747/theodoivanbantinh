@@ -109,6 +109,26 @@
     border-radius:50%; cursor:pointer; font-size:11px; line-height:1; display:flex; align-items:center; justify-content:center;
   }
 
+  /* ===== Department stats ===== */
+  .dept-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:18px; margin-bottom:24px;
+  }
+  .dept-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:6px; }
+  .dept-head h2{ font-size:16px; font-weight:600; }
+  .dept-head .hint{ font-size:12.5px; color:var(--ink-soft); }
+  .dept-stat-row{
+    display:flex; align-items:center; gap:14px; padding:10px 8px; border-radius:8px; cursor:pointer;
+    transition:background .15s ease;
+  }
+  .dept-stat-row:hover{ background:var(--gray-bg); }
+  .dept-stat-name{ width:230px; flex-shrink:0; font-size:13.5px; font-weight:600; }
+  .dept-stat-bar{ flex:1; height:10px; border-radius:999px; background:var(--gray-bg); overflow:hidden; min-width:60px; }
+  .dept-stat-fill{ height:100%; background:var(--danger); border-radius:999px; }
+  .dept-stat-nums{ width:180px; flex-shrink:0; text-align:right; font-size:12.5px; color:var(--ink-soft); white-space:nowrap; }
+  .dept-stat-nums strong{ color:var(--ink); font-weight:600; }
+  .dept-stat-overdue{ color:var(--danger); font-weight:600; margin-left:6px; }
+
   /* ===== Status chart ===== */
   .chart-card{
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
@@ -329,6 +349,9 @@
     .banner{ padding:16px; }
     .banner .meta{ text-align:left; }
     .a-preview .grow{ grid-template-columns:1fr; }
+    .dept-stat-row{ flex-wrap:wrap; }
+    .dept-stat-name{ width:100%; }
+    .dept-stat-nums{ width:100%; text-align:left; }
   }
 </style>
 </head>
@@ -475,6 +498,15 @@
       </div>
     </div>
 
+    <!-- Department stats -->
+    <div class="dept-card">
+      <div class="dept-head">
+        <h2>Theo phòng ban</h2>
+        <span class="hint">Bấm vào 1 phòng để xem nhiệm vụ của phòng đó</span>
+      </div>
+      <div id="deptStatsList"></div>
+    </div>
+
     <!-- Urgent -->
     <div class="urgent">
       <div class="urgent-head">
@@ -616,7 +648,7 @@ async function init(){
 
   if(!WEBAPP_URL){
     document.getElementById('configWarn').classList.add('show');
-    state.tasks = DEMO_TASKS;
+    state.tasks = normalizeTasksClientSide(DEMO_TASKS);
     document.getElementById('metaUpdated').textContent = 'Dữ liệu demo';
     renderAll();
     return;
@@ -630,13 +662,13 @@ async function loadTasks(){
     const res = await fetch(WEBAPP_URL + '?action=get_tasks');
     const data = await res.json();
     if(data.status !== 'ok') throw new Error(data.message || 'Lỗi không xác định');
-    state.tasks = data.tasks || [];
+    state.tasks = normalizeTasksClientSide(data.tasks || []);
     document.getElementById('metaUpdated').textContent = 'Cập nhật lúc ' + new Date().toLocaleTimeString('vi-VN', {hour:'2-digit', minute:'2-digit'});
     renderAll();
   }catch(err){
     showToast('Không tải được dữ liệu: ' + err.message, true);
     document.getElementById('configWarn').classList.add('show');
-    state.tasks = DEMO_TASKS;
+    state.tasks = normalizeTasksClientSide(DEMO_TASKS);
     renderAll();
   }
 }
@@ -680,6 +712,7 @@ function isOverdueTask(t){
 function renderAll(){
   renderStats();
   renderStatusChart();
+  renderDeptStats();
   renderUrgent();
   renderFilters();
   renderActiveFilters();
@@ -737,6 +770,42 @@ function renderStatusChart(){
       <span class="chart-dot" style="background:${seg.color}"></span>
       ${esc(seg.label)}: <strong>${seg.value}</strong>
     </div>`).join('');
+}
+
+function renderDeptStats(){
+  const tasks = state.tasks;
+  const map = {};
+  tasks.forEach(t => {
+    const key = t.don_vi && t.don_vi.trim() ? t.don_vi : '(Chưa gán phòng)';
+    if(!map[key]) map[key] = { total: 0, overdue: 0 };
+    map[key].total++;
+    if(isOverdueTask(t)) map[key].overdue++;
+  });
+
+  const rows = Object.keys(map)
+    .map(name => ({ name, total: map[name].total, overdue: map[name].overdue }))
+    .sort((a,b) => b.total - a.total);
+
+  const box = document.getElementById('deptStatsList');
+  if(rows.length === 0){
+    box.innerHTML = '<div class="empty-state">Chưa có dữ liệu.</div>';
+    return;
+  }
+
+  box.innerHTML = rows.map(r => {
+    const pct = r.total ? Math.round((r.overdue / r.total) * 100) : 0;
+    return `
+      <div class="dept-stat-row" onclick="goToDept('${escAttr(r.name)}')">
+        <div class="dept-stat-name">${esc(r.name)}</div>
+        <div class="dept-stat-bar"><div class="dept-stat-fill" style="width:${pct}%"></div></div>
+        <div class="dept-stat-nums"><strong>${r.total}</strong> nhiệm vụ<span class="dept-stat-overdue">${r.overdue} quá hạn</span></div>
+      </div>`;
+  }).join('');
+}
+
+function goToDept(name){
+  setFilter(name);
+  scrollToTaskList();
 }
 
 function renderUrgent(){
@@ -837,7 +906,11 @@ function renderTaskList(){
   const box = document.getElementById('taskListBody');
   let list = state.tasks;
   if(state.filterDept !== 'Tất cả phòng'){
-    list = list.filter(t => t.don_vi === state.filterDept);
+    if(state.filterDept === '(Chưa gán phòng)'){
+      list = list.filter(t => !t.don_vi || !t.don_vi.trim());
+    } else {
+      list = list.filter(t => t.don_vi === state.filterDept);
+    }
   }
   if(state.filterStatus === 'Quá hạn'){
     list = list.filter(isOverdueTask);
@@ -1107,6 +1180,11 @@ function normalizeDonVi(raw){
   const text = String(raw || '').trim();
   if(!text) return { donVi: '', note: '' };
 
+  // Vài giá trị người nhập gõ nhầm/ghi chú thay vì tên phòng thật (VD "Bỏ")
+  if(/^(bỏ|không|trống|-)$/i.test(text)){
+    return { donVi: '', note: `Ghi chú gốc: "${text}" (chưa xác định được đơn vị)` };
+  }
+
   let best = null;
   for(const dept of DEPT_ALIASES){
     for(const pattern of dept.patterns){
@@ -1125,6 +1203,20 @@ function normalizeDonVi(raw){
   rest = rest.replace(/^(tham mưu|đã)(?=\s|$)/i, '').trim();
   rest = rest.replace(/^[,.:\-–]+\s*/, '').trim();
   return { donVi: best.name, note: rest };
+}
+
+// Áp dụng chuẩn hóa tên phòng cho MỌI nhiệm vụ mỗi khi tải dữ liệu — kể cả dữ liệu
+// cũ đã có sẵn trong Sheet từ trước (nhập tay không nhất quán, hoặc import cũ
+// trước khi có bước chuẩn hóa này). Không sửa gì trong Sheet, chỉ chuẩn hóa lúc hiển thị.
+function normalizeTasksClientSide(tasks){
+  return (tasks || []).map(t => {
+    const { donVi, note } = normalizeDonVi(t.don_vi);
+    return {
+      ...t,
+      don_vi: donVi,
+      mo_ta: (t.mo_ta && t.mo_ta.trim()) ? t.mo_ta : note,
+    };
+  });
 }
 
 async function handleDocxUpload(file){
