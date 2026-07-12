@@ -1441,6 +1441,13 @@ async function exportReportDocx(){
     const thinBorder = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
     const cellBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
 
+    // Khổ A4, lề chuẩn văn bản hành chính VN -> tính ra bề rộng vùng nội dung thực tế (DXA)
+    const PAGE_MARGIN = { top: 1134, bottom: 1134, left: 1701, right: 1134 };
+    const TABLE_WIDTH = 9071; // = 11906 (A4) - lề trái - lề phải
+
+    // Độ rộng từng cột theo thứ tự: TT, Số, Ký hiệu, Ngày ban hành, Tóm tắt, Hạn xử lý, Ý kiến, Đơn vị
+    const COL_WIDTHS = [454, 544, 635, 635, 2268, 816, 1905, 1814];
+
     function txt(text, opts){
       opts = opts || {};
       return new Paragraph({
@@ -1449,10 +1456,12 @@ async function exportReportDocx(){
       });
     }
 
+    // width phải truyền bằng DXA (số nguyên), không dùng PERCENTAGE — PERCENTAGE khiến
+    // Word/Pages tự co cột theo nội dung, chữ bị dồn thành từng ký tự dọc như đã gặp lỗi.
     function cell(text, opts){
       opts = opts || {};
       return new TableCell({
-        width: opts.width ? { size: opts.width, type: WidthType.PERCENTAGE } : undefined,
+        width: { size: opts.width || 0, type: WidthType.DXA },
         columnSpan: opts.colSpan,
         verticalAlign: VerticalAlign.CENTER,
         borders: opts.noBorder ? { top:noBorder,bottom:noBorder,left:noBorder,right:noBorder } : cellBorders,
@@ -1463,15 +1472,16 @@ async function exportReportDocx(){
 
     // ---- Khối quốc hiệu / tiêu ngữ ----
     const headerTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: TABLE_WIDTH, type: WidthType.DXA },
+      columnWidths: [Math.round(TABLE_WIDTH*0.45), Math.round(TABLE_WIDTH*0.55)],
       rows: [
         new TableRow({ children: [
-          cell('ỦY BAN NHÂN DÂN\nXÃ KRÔNG BÚK', { bold:true, align:AlignmentType.CENTER, noBorder:true, width:45 }),
-          cell('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc', { bold:true, align:AlignmentType.CENTER, noBorder:true, width:55 }),
+          cell('ỦY BAN NHÂN DÂN\nXÃ KRÔNG BÚK', { bold:true, align:AlignmentType.CENTER, noBorder:true, width:Math.round(TABLE_WIDTH*0.45) }),
+          cell('CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc', { bold:true, align:AlignmentType.CENTER, noBorder:true, width:Math.round(TABLE_WIDTH*0.55) }),
         ]}),
         new TableRow({ children: [
-          cell('', { noBorder:true }),
-          cell(`Krông Búk, ngày ${String(now.getDate()).padStart(2,'0')} tháng ${thisMonth} năm ${thisYear}`, { italics:true, align:AlignmentType.CENTER, noBorder:true }),
+          cell('', { noBorder:true, width:Math.round(TABLE_WIDTH*0.45) }),
+          cell(`Krông Búk, ngày ${String(now.getDate()).padStart(2,'0')} tháng ${thisMonth} năm ${thisYear}`, { italics:true, align:AlignmentType.CENTER, noBorder:true, width:Math.round(TABLE_WIDTH*0.55) }),
         ]}),
       ],
     });
@@ -1496,28 +1506,31 @@ async function exportReportDocx(){
     const headerRow1 = new TableRow({
       tableHeader: true,
       children: [
-        cell('TT', { bold:true, align:AlignmentType.CENTER, width:5 }),
-        cell('Văn bản giao nhiệm vụ (Số, ký hiệu, ngày tháng năm)', { bold:true, align:AlignmentType.CENTER, colSpan:3, width:20 }),
-        cell('Tóm tắt nội dung chính', { bold:true, align:AlignmentType.CENTER, width:25 }),
-        cell('Hạn xử lý', { bold:true, align:AlignmentType.CENTER, width:9 }),
-        cell('Ý kiến giải trình hoặc kiến nghị, đề xuất', { bold:true, align:AlignmentType.CENTER, width:21 }),
-        cell('Đơn vị chủ trì tham mưu', { bold:true, align:AlignmentType.CENTER, width:20 }),
+        cell('TT', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[0] }),
+        cell('Văn bản giao nhiệm vụ (Số, ký hiệu, ngày tháng năm)', { bold:true, align:AlignmentType.CENTER, colSpan:3, width:COL_WIDTHS[1]+COL_WIDTHS[2]+COL_WIDTHS[3] }),
+        cell('Tóm tắt nội dung chính', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[4] }),
+        cell('Hạn xử lý', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[5] }),
+        cell('Ý kiến giải trình hoặc kiến nghị, đề xuất', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[6] }),
+        cell('Đơn vị chủ trì tham mưu', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[7] }),
       ],
     });
     const headerRow2 = new TableRow({
       tableHeader: true,
       children: [
-        cell('', { noBorder:false }),
-        cell('Số', { bold:true, align:AlignmentType.CENTER }),
-        cell('Ký hiệu', { bold:true, align:AlignmentType.CENTER }),
-        cell('Ngày tháng năm ban hành', { bold:true, align:AlignmentType.CENTER }),
-        cell('', {}), cell('', {}), cell('', {}), cell('', {}),
+        cell('', { width:COL_WIDTHS[0] }),
+        cell('Số', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[1] }),
+        cell('Ký hiệu', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[2] }),
+        cell('Ngày tháng năm ban hành', { bold:true, align:AlignmentType.CENTER, width:COL_WIDTHS[3] }),
+        cell('', { width:COL_WIDTHS[4] }),
+        cell('', { width:COL_WIDTHS[5] }),
+        cell('', { width:COL_WIDTHS[6] }),
+        cell('', { width:COL_WIDTHS[7] }),
       ],
     });
 
     function sectionRow(label){
       return new TableRow({ children: [
-        cell(label, { bold:true, colSpan:8, shade:'F2F2F2' }),
+        cell(label, { bold:true, colSpan:8, shade:'F2F2F2', width:TABLE_WIDTH }),
       ]});
     }
 
@@ -1527,14 +1540,14 @@ async function exportReportDocx(){
         const isDone = t.trang_thai === 'Hoàn thành';
         const yKien = isDone ? [t.minh_chung, t.mo_ta].filter(Boolean).join(' — ') : '';
         return new TableRow({ children: [
-          cell(String(i + 1), { align:AlignmentType.CENTER }),
-          cell(so, { align:AlignmentType.CENTER }),
-          cell(kyHieu, { align:AlignmentType.CENTER }),
-          cell(t.ngay_ban_hanh || '', { align:AlignmentType.CENTER }),
-          cell(t.tom_tat || ''),
-          cell(t.han_xu_ly || '', { align:AlignmentType.CENTER }),
-          cell(yKien),
-          cell(t.don_vi || ''),
+          cell(String(i + 1), { align:AlignmentType.CENTER, width:COL_WIDTHS[0] }),
+          cell(so, { align:AlignmentType.CENTER, width:COL_WIDTHS[1] }),
+          cell(kyHieu, { align:AlignmentType.CENTER, width:COL_WIDTHS[2] }),
+          cell(t.ngay_ban_hanh || '', { align:AlignmentType.CENTER, width:COL_WIDTHS[3] }),
+          cell(t.tom_tat || '', { width:COL_WIDTHS[4] }),
+          cell(t.han_xu_ly || '', { align:AlignmentType.CENTER, width:COL_WIDTHS[5] }),
+          cell(yKien, { width:COL_WIDTHS[6] }),
+          cell(t.don_vi || '', { width:COL_WIDTHS[7] }),
         ]});
       });
     }
@@ -1548,13 +1561,19 @@ async function exportReportDocx(){
     ];
 
     const detailTable = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: TABLE_WIDTH, type: WidthType.DXA },
+      columnWidths: COL_WIDTHS,
       rows: bodyRows,
     });
 
     const doc = new Document({
       sections: [{
-        properties: {},
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 }, // A4
+            margin: PAGE_MARGIN,
+          },
+        },
         children: [ headerTable, ...titleBlock, detailTable ],
       }],
     });
