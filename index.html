@@ -27,6 +27,8 @@
     --danger-bg: #F8E4E2;
     --gray-bg: #EFECE3;
     --radius: 10px;
+    --chart-red: #E4483C;
+    --chart-teal: #14B8A6;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -122,9 +124,11 @@
     transition:background .15s ease;
   }
   .dept-stat-row:hover{ background:var(--gray-bg); }
-  .dept-stat-name{ width:230px; flex-shrink:0; font-size:13.5px; font-weight:600; }
-  .dept-stat-bar{ flex:1; height:10px; border-radius:999px; background:var(--gray-bg); overflow:hidden; min-width:60px; }
-  .dept-stat-fill{ height:100%; background:var(--danger); border-radius:999px; }
+  .dept-stat-name{ width:230px; flex-shrink:0; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .dept-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .dept-stat-bar{ flex:1; height:12px; border-radius:999px; background:var(--gray-bg); overflow:hidden; min-width:60px; }
+  .dept-stat-fill{ height:100%; border-radius:999px; position:relative; transition:width .2s ease; }
+  .dept-stat-overdue-seg{ position:absolute; top:0; right:0; height:100%; background:rgba(166,27,43,.68); border-radius:0 999px 999px 0; }
   .dept-stat-nums{ width:180px; flex-shrink:0; text-align:right; font-size:12.5px; color:var(--ink-soft); white-space:nowrap; }
   .dept-stat-nums strong{ color:var(--ink); font-weight:600; }
   .dept-stat-overdue{ color:var(--danger); font-weight:600; margin-left:6px; }
@@ -138,6 +142,29 @@
   .chart-head h2{ font-size:16px; font-weight:600; }
   .chart-head .hint{ font-size:12.5px; color:var(--ink-soft); }
   .chart-body{ display:flex; align-items:center; gap:28px; flex-wrap:wrap; }
+  .chart-divider{ width:1px; align-self:stretch; background:var(--line); min-height:110px; }
+  .dept-mini-chart-wrap{ flex:1; min-width:240px; }
+  .dmc-legend{ display:flex; gap:16px; font-size:11.5px; color:var(--ink-soft); margin-bottom:10px; padding-left:8px; }
+  .dmc-legend span{ display:flex; align-items:center; gap:5px; }
+  .dmc-legend i{ display:inline-block; width:9px; height:9px; border-radius:3px; }
+  .dept-mini-chart{
+    display:flex; align-items:flex-end; gap:12px; height:135px; padding:0 4px 0 8px;
+  }
+  .dmc-bar-wrap{
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    flex:1; height:100%; cursor:pointer;
+  }
+  .dmc-value{ font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:5px; white-space:nowrap; }
+  .dmc-value .dmc-value-over{ color:var(--chart-red); }
+  .dmc-value-sep{ color:var(--ink-soft); font-weight:500; }
+  .dmc-stack{
+    width:100%; max-width:26px; display:flex; flex-direction:column;
+    border-radius:5px 5px 2px 2px; overflow:hidden; transition:opacity .15s ease;
+  }
+  .dmc-bar-wrap:hover .dmc-stack{ opacity:.8; }
+  .dmc-seg-ok{ background:var(--chart-teal); }
+  .dmc-seg-overdue{ background:var(--chart-red); }
+  .dmc-label{ font-size:10px; color:var(--ink-soft); margin-top:6px; text-align:center; line-height:1.25; word-break:break-word; }
   .chart-legend{ display:flex; flex-direction:column; gap:9px; }
   .chart-legend-item{
     display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;
@@ -176,6 +203,7 @@
   .a-preview .grow{ display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px; }
   .a-preview label{ display:block; font-size:11px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px; }
   .a-preview input, .a-preview select{ width:100%; font-family:inherit; font-size:13.5px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; }
+  .a-preview input.needs-input{ border-color:var(--amber); background:var(--amber-bg); }
   .a-preview .full{ grid-column:1/-1; }
 
   /* ===== Overview cards ===== */
@@ -301,6 +329,10 @@
   .file-drop input{ display:none; }
   .bulk-summary{ margin-top:14px; display:none; }
   .bulk-summary.show{ display:block; }
+  .b-format-note{
+    background:#EAF1F8; border:1px solid #B9D3E8; color:#1C4A6E;
+    font-size:12.5px; padding:10px 14px; border-radius:8px; margin-bottom:12px;
+  }
   .bulk-summary .b-counts{
     display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;
   }
@@ -352,6 +384,9 @@
     .dept-stat-row{ flex-wrap:wrap; }
     .dept-stat-name{ width:100%; }
     .dept-stat-nums{ width:100%; text-align:left; }
+    .chart-divider{ display:none; }
+    .dept-mini-chart-wrap{ width:100%; min-width:0; }
+    .dept-mini-chart{ height:120px; }
   }
 </style>
 </head>
@@ -387,10 +422,10 @@
     <!-- Admin panel -->
     <div class="admin-panel" id="adminPanel">
       <div class="a-head"><h2>Nhập nhiệm vụ mới từ iDesk</h2></div>
-      <div class="a-sub">Mở văn bản trên iDesk (qlvb.daklak.gov.vn) → chọn "Select All" → Copy → dán nguyên khối vào đây. AI sẽ tự tách các trường bên dưới.</div>
+      <div class="a-sub">Mở văn bản trên iDesk (qlvb.daklak.gov.vn) → chọn "Select All" → Copy → dán nguyên khối vào đây. Hệ thống sẽ tự tách các trường bên dưới.</div>
       <textarea id="pasteBox" placeholder="Dán nội dung copy từ iDesk vào đây..."></textarea>
       <div class="admin-actions">
-        <button class="btn btn-primary" id="btnParse" onclick="parseFromIdesk()">Tách tự động bằng AI</button>
+        <button class="btn btn-primary" id="btnParse" onclick="parseFromIdesk()">Nhập nhiệm vụ từ iDesk</button>
         <span class="a-hint">Kết quả sẽ hiện thành form bên dưới để kiểm tra trước khi lưu</span>
       </div>
       <div class="a-error" id="aError"></div>
@@ -423,8 +458,12 @@
             </select>
           </div>
           <div>
-            <label>Hạn xử lý</label>
-            <input type="text" id="pHanXuLy" placeholder="dd/mm/yyyy">
+            <label>Hạn xử lý <span class="req">*</span></label>
+            <input type="text" id="pHanXuLy" placeholder="dd/mm/yyyy — luôn kiểm tra/nhập tay, hệ thống không tự đoán"
+              oninput="this.classList.remove('needs-input'); document.getElementById('pHanXuLyWarn').style.display='none';">
+            <div class="fhint" id="pHanXuLyWarn" style="display:none; color:var(--amber); font-weight:600;">
+              ⚠️ Văn bản không nêu rõ hạn xử lý — bắt buộc nhập tay trước khi lưu.
+            </div>
           </div>
         </div>
         <div class="admin-actions">
@@ -451,11 +490,12 @@
         <div class="b-status" id="bStatus"></div>
 
         <div class="bulk-summary" id="bulkSummary">
+          <div class="b-format-note" id="bFormatNote" style="display:none;"></div>
           <div class="b-counts">
             <div class="b-count"><strong id="bTotal">0</strong>Tổng đọc được</div>
             <div class="b-count"><strong id="bDoneOnTime">0</strong>Hoàn thành trong hạn</div>
             <div class="b-count"><strong id="bDoneLate">0</strong>Hoàn thành quá hạn</div>
-            <div class="b-count"><strong id="bTodo">0</strong>Chưa hoàn thành</div>
+            <div class="b-count"><strong id="bTodo">0</strong><span id="bTodoLabel">Chưa hoàn thành</span></div>
           </div>
           <div class="bulk-warn-list" id="bulkWarnings" style="display:none;"></div>
           <div class="bulk-preview" id="bulkPreview"></div>
@@ -496,6 +536,14 @@
       <div class="chart-body">
         <div id="statusChart"></div>
         <div class="chart-legend" id="chartLegend"></div>
+        <div class="chart-divider"></div>
+        <div class="dept-mini-chart-wrap">
+          <div class="dmc-legend">
+            <span><i style="background:var(--chart-red)"></i>Quá hạn</span>
+            <span><i style="background:var(--chart-teal)"></i>Chưa quá hạn</span>
+          </div>
+          <div class="dept-mini-chart" id="deptMiniChart"></div>
+        </div>
       </div>
     </div>
 
@@ -633,6 +681,36 @@ const DEPARTMENTS = [
   'Trung tâm cung ứng dịch vụ sự nghiệp công', 'Trạm Y tế',
 ];
 
+// Mỗi phòng ban 1 màu riêng để dễ phân biệt trực quan — cố tình tránh tông đỏ/hồng
+// vì đỏ đã dùng riêng để báo "quá hạn", tránh gây hiểu nhầm cả phòng đều đang trễ hạn.
+const DEPT_COLORS = {
+  'Phòng Kinh tế': '#2E6F9E',
+  'Phòng Văn hóa – Xã hội': '#7B4B94',
+  'Trung tâm Phục vụ hành chính công': '#1F7A5C',
+  'Công an xã': '#B4700E',
+  'Ban Chỉ huy Quân sự xã': '#5C6B2E',
+  'Văn phòng HĐND-UBND': '#1C2A44',
+  'Trung tâm cung ứng dịch vụ sự nghiệp công': '#8A6D3B',
+  'Trạm Y tế': '#2B8C93',
+  '(Chưa gán phòng)': '#9B948A',
+};
+const DEPT_COLOR_FALLBACK = '#6B6459';
+
+const DEPT_SHORT = {
+  'Phòng Kinh tế': 'Kinh tế',
+  'Phòng Văn hóa – Xã hội': 'VHXH',
+  'Trung tâm Phục vụ hành chính công': 'PVHCC',
+  'Công an xã': 'Công an',
+  'Ban Chỉ huy Quân sự xã': 'CHQS',
+  'Văn phòng HĐND-UBND': 'Văn phòng',
+  'Trung tâm cung ứng dịch vụ sự nghiệp công': 'DVSNC',
+  'Trạm Y tế': 'Y tế',
+  '(Chưa gán phòng)': 'Chưa gán',
+};
+
+function deptColor(name){ return DEPT_COLORS[name] || DEPT_COLOR_FALLBACK; }
+function deptShort(name){ return DEPT_SHORT[name] || name; }
+
 const state = { tasks: [], filterDept: 'Tất cả phòng', filterStatus: null, currentEditCode: null, adminUnlocked: false };
 
 /* ============ Khởi động ============ */
@@ -713,6 +791,7 @@ function isOverdueTask(t){
 function renderAll(){
   renderStats();
   renderStatusChart();
+  renderDeptMiniChart();
   renderDeptStats();
   renderUrgent();
   renderFilters();
@@ -773,6 +852,41 @@ function renderStatusChart(){
     </div>`).join('');
 }
 
+function renderDeptMiniChart(){
+  const tasks = state.tasks;
+  const map = {};
+  DEPARTMENTS.forEach(d => { map[d] = { total: 0, overdue: 0 }; });
+  tasks.forEach(t => {
+    const key = t.don_vi && t.don_vi.trim() ? t.don_vi : '(Chưa gán phòng)';
+    if(!map[key]) map[key] = { total: 0, overdue: 0 };
+    map[key].total++;
+    if(isOverdueTask(t)) map[key].overdue++;
+  });
+
+  const rows = Object.keys(map).map(name => ({ name, total: map[name].total, overdue: map[name].overdue }));
+  const maxV = Math.max(1, ...rows.map(r => r.total));
+  const MAX_PX = 92;
+
+  document.getElementById('deptMiniChart').innerHTML = rows.map(r => {
+    const notOverdue = r.total - r.overdue;
+    const totalH = r.total ? Math.max(10, Math.round((r.total / maxV) * MAX_PX)) : 2;
+    const overdueH = r.total ? Math.round((r.overdue / r.total) * totalH) : 0;
+    const okH = Math.max(0, totalH - overdueH);
+    const valueLabel = r.overdue > 0
+      ? `<span class="dmc-value-over">${r.overdue}</span><span class="dmc-value-sep">/</span>${r.total}`
+      : `${r.total}`;
+    return `
+      <div class="dmc-bar-wrap" onclick="goToDept('${escAttr(r.name)}')" title="${esc(r.name)}: ${r.overdue}/${r.total} quá hạn">
+        <div class="dmc-value">${valueLabel}</div>
+        <div class="dmc-stack" style="height:${totalH}px;">
+          ${r.overdue > 0 ? `<div class="dmc-seg-overdue" style="height:${overdueH}px;"></div>` : ''}
+          ${okH > 0 ? `<div class="dmc-seg-ok" style="height:${okH}px;"></div>` : ''}
+        </div>
+        <div class="dmc-label">${esc(deptShort(r.name))}</div>
+      </div>`;
+  }).join('');
+}
+
 function renderDeptStats(){
   const tasks = state.tasks;
   const map = {};
@@ -798,12 +912,20 @@ function renderDeptStats(){
     return;
   }
 
+  const maxTotal = Math.max(1, ...rows.map(r => r.total));
+
   box.innerHTML = rows.map(r => {
-    const pct = r.total ? Math.round((r.overdue / r.total) * 100) : 0;
+    const color = deptColor(r.name);
+    const totalPct = Math.max(r.total ? 4 : 0, Math.round((r.total / maxTotal) * 100));
+    const overduePct = r.total ? Math.round((r.overdue / r.total) * 100) : 0;
     return `
       <div class="dept-stat-row" onclick="goToDept('${escAttr(r.name)}')">
-        <div class="dept-stat-name">${esc(r.name)}</div>
-        <div class="dept-stat-bar"><div class="dept-stat-fill" style="width:${pct}%"></div></div>
+        <div class="dept-stat-name"><span class="dept-dot" style="background:${color}"></span>${esc(r.name)}</div>
+        <div class="dept-stat-bar">
+          <div class="dept-stat-fill" style="width:${totalPct}%; background:${color};">
+            <div class="dept-stat-overdue-seg" style="width:${overduePct}%;"></div>
+          </div>
+        </div>
         <div class="dept-stat-nums"><strong>${r.total}</strong> nhiệm vụ<span class="dept-stat-overdue">${r.overdue} quá hạn</span></div>
       </div>`;
   }).join('');
@@ -1014,28 +1136,24 @@ async function saveStatus(){
     if(invalid) return;
   }
 
-  const btn = document.getElementById('btnSaveStatus');
-  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  // Cập nhật giao diện NGAY LẬP TỨC (không chờ Sheet) — chỉ khôi phục lại nếu lưu thất bại
+  const task = state.tasks.find(x => x.so_ky_hieu === code);
+  const prevSnapshot = task ? { ...task } : null;
+  if(task){ task.trang_thai = trangThai; task.minh_chung = minhChung; task.mo_ta = moTa; }
+  renderAll();
+  closeModal();
+  showToast('Đã cập nhật trạng thái');
+
+  if(!WEBAPP_URL) return; // chế độ demo, không có Sheet thật để lưu
 
   try{
-    if(!WEBAPP_URL){
-      // Chế độ demo — cập nhật tạm trong bộ nhớ trình duyệt
-      const t = state.tasks.find(x => x.so_ky_hieu === code);
-      if(t){ t.trang_thai = trangThai; t.minh_chung = minhChung; t.mo_ta = moTa; }
-      renderAll();
-      showToast('Đã cập nhật (chế độ demo, chưa lưu thật)');
-      closeModal();
-      return;
-    }
     const res = await callApi({ action:'update_status', so_ky_hieu: code, trang_thai: trangThai, minh_chung: minhChung, mo_ta: moTa });
     if(res.status !== 'ok') throw new Error(res.message || 'Lỗi không xác định');
-    showToast('Đã cập nhật trạng thái');
-    closeModal();
-    await loadTasks();
+    // Lưu thành công — giao diện đã đúng từ trước, không cần làm gì thêm
   }catch(err){
-    showToast('Lỗi: ' + err.message, true);
-  }finally{
-    btn.disabled = false; btn.textContent = 'Lưu cập nhật';
+    if(task && prevSnapshot) Object.assign(task, prevSnapshot);
+    renderAll();
+    showToast('Lưu vào Sheet thất bại, đã khôi phục lại: ' + err.message, true);
   }
 }
 
@@ -1096,7 +1214,7 @@ async function parseFromIdesk(){
   btn.disabled = true; btn.textContent = 'Đang tách...';
 
   try{
-    if(!WEBAPP_URL) throw new Error('Chưa cấu hình WEBAPP_URL nên chưa gọi được AI. Dán URL Apps Script vào đầu file để dùng tính năng này.');
+    if(!WEBAPP_URL) throw new Error('Chưa cấu hình WEBAPP_URL nên chưa gọi được hệ thống. Dán URL Apps Script vào đầu file để dùng tính năng này.');
     const res = await callApi({ action:'parse_text', text: text });
     if(res.status !== 'ok') throw new Error(res.message || 'Lỗi không xác định');
 
@@ -1104,49 +1222,76 @@ async function parseFromIdesk(){
     document.getElementById('pSoKyHieu').value = d.so_ky_hieu || '';
     document.getElementById('pNgayBanHanh').value = d.ngay_ban_hanh || '';
     document.getElementById('pTomTat').value = d.tom_tat || '';
-    document.getElementById('pHanXuLy').value = d.han_xu_ly || '';
     if(d.don_vi){
       const sel = document.getElementById('pDonVi');
       const opt = Array.from(sel.options).find(o => o.value === d.don_vi);
       if(opt) sel.value = d.don_vi;
     }
+
+    // Hạn xử lý: KHÔNG bao giờ tự đoán/mặc định — chỉ điền nếu văn bản nêu rõ.
+    // Thiếu thì để trống và cảnh báo rõ, bắt buộc Admin tự nhập tay.
+    const hanInput = document.getElementById('pHanXuLy');
+    hanInput.value = d.han_xu_ly || '';
+    const hanWarn = document.getElementById('pHanXuLyWarn');
+    if(!d.han_xu_ly){
+      hanInput.classList.add('needs-input');
+      hanWarn.style.display = 'block';
+    } else {
+      hanInput.classList.remove('needs-input');
+      hanWarn.style.display = 'none';
+    }
+
     document.getElementById('aPreview').classList.add('show');
   }catch(err){
     errBox.textContent = 'Lỗi: ' + err.message;
     errBox.classList.add('show');
   }finally{
-    btn.disabled = false; btn.textContent = 'Tách tự động bằng AI';
+    btn.disabled = false; btn.textContent = 'Nhập nhiệm vụ từ iDesk';
   }
 }
 
 async function saveNewTask(){
+  const hanInput = document.getElementById('pHanXuLy');
+  const hanXuLy = hanInput.value.trim();
+
   const payload = {
     action: 'add_task',
     so_ky_hieu: document.getElementById('pSoKyHieu').value.trim(),
     ngay_ban_hanh: document.getElementById('pNgayBanHanh').value.trim(),
     tom_tat: document.getElementById('pTomTat').value.trim(),
     don_vi: document.getElementById('pDonVi').value,
-    han_xu_ly: document.getElementById('pHanXuLy').value.trim(),
+    han_xu_ly: hanXuLy,
   };
   if(!payload.so_ky_hieu){ showToast('Thiếu số ký hiệu văn bản', true); return; }
+  if(!hanXuLy){
+    hanInput.classList.add('needs-input');
+    document.getElementById('pHanXuLyWarn').style.display = 'block';
+    hanInput.focus();
+    showToast('Văn bản không nêu rõ hạn xử lý — vui lòng nhập tay trước khi lưu', true);
+    return;
+  }
+
+  // Thêm ngay vào danh sách hiển thị (không chờ Sheet) — giữ lại nội dung đã dán
+  // để có thể khôi phục nếu lưu thất bại, tránh mất công gõ lại.
+  const optimisticTask = { ...payload, trang_thai:'Chưa xử lý', minh_chung:'', mo_ta:'' };
+  const pasteBoxBackup = document.getElementById('pasteBox').value;
+  state.tasks.push(optimisticTask);
+  renderAll();
+  showToast('Đã thêm nhiệm vụ mới');
+  document.getElementById('pasteBox').value = '';
+  document.getElementById('aPreview').classList.remove('show');
+
+  if(!WEBAPP_URL) return; // chế độ demo, không có Sheet thật để lưu
 
   try{
-    if(!WEBAPP_URL){
-      state.tasks.push({ ...payload, trang_thai:'Chưa xử lý', minh_chung:'', mo_ta:'' });
-      renderAll();
-      showToast('Đã thêm (chế độ demo, chưa lưu thật)');
-      document.getElementById('pasteBox').value = '';
-      document.getElementById('aPreview').classList.remove('show');
-      return;
-    }
     const res = await callApi(payload);
     if(res.status !== 'ok') throw new Error(res.message || 'Lỗi không xác định');
-    showToast('Đã thêm nhiệm vụ mới');
-    document.getElementById('pasteBox').value = '';
-    document.getElementById('aPreview').classList.remove('show');
-    await loadTasks();
+    await loadTasks(); // đồng bộ lại để lấy đúng ngày cập nhật thật từ Sheet
   }catch(err){
-    showToast('Lỗi: ' + err.message, true);
+    state.tasks = state.tasks.filter(t => t !== optimisticTask);
+    renderAll();
+    document.getElementById('pasteBox').value = pasteBoxBackup;
+    showToast('Lưu thất bại, vui lòng thử lại: ' + err.message, true);
   }
 }
 
@@ -1253,26 +1398,35 @@ async function handleDocxUpload(file){
       'IV': { trang_thai: 'Chưa xử lý' },
     };
 
+    const allCells = rows.map(tr => Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.replace(/\s+/g,' ').trim()));
+
+    // Phát hiện file có chia mục I/II/III/IV hay không — không phải file nào cũng có
+    // (VD: danh sách việc MỚI GIAO trong tháng thường chỉ là bảng phẳng, chưa ai xử lý gì để mà phân loại)
+    const hasSections = allCells.some(cells => {
+      const roman = cells.find(c => /^(I|II|III|IV)$/.test(c));
+      return roman && cells.join(' ').toUpperCase().includes('NHIỆM VỤ');
+    });
+
     let currentSection = null;
     const tasks = [];
     const warnings = [];
 
-    rows.forEach((tr, rowIdx) => {
-      const cells = Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.replace(/\s+/g,' ').trim());
+    allCells.forEach((cells, rowIdx) => {
       if(cells.every(c => !c)) return; // dòng trống, bỏ qua
 
-      // Dòng đánh dấu mục I/II/III/IV
-      const roman = cells.find(c => /^(I|II|III|IV)$/.test(c));
-      if(roman && cells.join(' ').toUpperCase().includes('NHIỆM VỤ')){
-        currentSection = roman;
-        return;
+      if(hasSections){
+        const roman = cells.find(c => /^(I|II|III|IV)$/.test(c));
+        if(roman && cells.join(' ').toUpperCase().includes('NHIỆM VỤ')){
+          currentSection = roman;
+          return;
+        }
       }
 
-      // Dòng tiêu đề bảng / mục A,B — bỏ qua
-      if(cells[0] === 'TT' || cells.includes('Số') && cells.includes('Ký hiệu')) return;
+      // Dòng tiêu đề bảng / mục A,B — bỏ qua (áp dụng cho cả 2 kiểu file)
+      if(cells[0] === 'TT' || (cells.includes('Số') && cells.includes('Ký hiệu'))) return;
       if(/^[AB]$/.test(cells[0]) && cells.join(' ').toUpperCase().includes('NHIỆM VỤ')) return;
 
-      if(!currentSection) return; // chưa vào mục nào thì bỏ qua (thường là dòng tiêu đề đầu file)
+      if(hasSections && !currentSection) return; // file có mục nhưng dòng này nằm trước mục đầu tiên
 
       // Dòng dữ liệu thật — cần ít nhất 6 cột có nghĩa
       if(cells.length < 6){
@@ -1280,15 +1434,27 @@ async function handleDocxUpload(file){
         return;
       }
 
-      const [, so, kyHieu, ngayBanHanh, tomTat, hanXuLy, yKien, donVi] = cells;
+      const [, so, kyHieu, ngayBanHanh, tomTat, hanXuLy, yKien, donViRaw] = cells;
       if(!so && !kyHieu){
         warnings.push(`Dòng ${rowIdx + 1}: không có số/ký hiệu văn bản, đã bỏ qua.`);
         return;
       }
 
       const soKyHieu = [so, kyHieu].filter(Boolean).join('/');
-      const isDone = currentSection === 'I' || currentSection === 'II';
-      const { donVi: cleanDonVi, note } = normalizeDonVi(donVi);
+      const { donVi: cleanDonVi, note } = normalizeDonVi(donViRaw);
+
+      let trangThai, minhChung, ghiChu;
+      if(hasSections){
+        const isDone = currentSection === 'I' || currentSection === 'II';
+        trangThai = SECTION_MAP[currentSection].trang_thai;
+        minhChung = isDone ? (yKien || '') : '';
+        ghiChu = note || '';
+      } else {
+        // File không chia mục -> hiểu là danh sách việc MỚI GIAO, chưa ai xử lý, chưa có kết quả
+        trangThai = 'Chưa xử lý';
+        minhChung = '';
+        ghiChu = (yKien && yKien.trim()) ? yKien.trim() : (note || '');
+      }
 
       tasks.push({
         so_ky_hieu: soKyHieu,
@@ -1296,19 +1462,19 @@ async function handleDocxUpload(file){
         tom_tat: tomTat || '',
         don_vi: cleanDonVi,
         han_xu_ly: normalizeVNDate(hanXuLy),
-        trang_thai: SECTION_MAP[currentSection].trang_thai,
-        minh_chung: isDone ? (yKien || '') : '',
-        mo_ta: note || '',
-        _section: currentSection,
+        trang_thai: trangThai,
+        minh_chung: minhChung,
+        mo_ta: ghiChu,
+        _section: hasSections ? currentSection : null,
       });
     });
 
     if(tasks.length === 0){
-      throw new Error('Đọc được file nhưng không tách ra được nhiệm vụ nào. Kiểm tra file có đúng khuôn mẫu (mục I/II/III/IV) không.');
+      throw new Error('Đọc được file nhưng không tách ra được nhiệm vụ nào. Kiểm tra định dạng bảng trong file.');
     }
 
     bulkParsedTasks = tasks;
-    renderBulkSummary(tasks, warnings);
+    renderBulkSummary(tasks, warnings, hasSections);
     statusEl.classList.remove('show');
   }catch(err){
     statusEl.textContent = 'Lỗi khi đọc file: ' + err.message;
@@ -1317,15 +1483,27 @@ async function handleDocxUpload(file){
   }
 }
 
-function renderBulkSummary(tasks, warnings){
-  const doneOnTime = tasks.filter(t => t._section === 'I').length;
-  const doneLate = tasks.filter(t => t._section === 'II').length;
-  const todo = tasks.filter(t => t._section === 'III' || t._section === 'IV').length;
-
+function renderBulkSummary(tasks, warnings, hasSections){
   document.getElementById('bTotal').textContent = tasks.length;
-  document.getElementById('bDoneOnTime').textContent = doneOnTime;
-  document.getElementById('bDoneLate').textContent = doneLate;
-  document.getElementById('bTodo').textContent = todo;
+
+  const noteBox = document.getElementById('bFormatNote');
+  if(hasSections){
+    const doneOnTime = tasks.filter(t => t._section === 'I').length;
+    const doneLate = tasks.filter(t => t._section === 'II').length;
+    const todo = tasks.filter(t => t._section === 'III' || t._section === 'IV').length;
+    document.getElementById('bDoneOnTime').textContent = doneOnTime;
+    document.getElementById('bDoneLate').textContent = doneLate;
+    document.getElementById('bTodo').textContent = todo;
+    document.getElementById('bTodoLabel').textContent = 'Chưa hoàn thành';
+    noteBox.style.display = 'none';
+  } else {
+    document.getElementById('bDoneOnTime').textContent = '—';
+    document.getElementById('bDoneLate').textContent = '—';
+    document.getElementById('bTodo').textContent = tasks.length;
+    document.getElementById('bTodoLabel').textContent = 'Chưa xử lý (mới giao)';
+    noteBox.style.display = 'block';
+    noteBox.textContent = 'ℹ️ File này không chia mục I/II/III/IV — được hiểu là danh sách việc mới giao trong tháng, toàn bộ sẽ được thêm với trạng thái "Chưa xử lý".';
+  }
 
   const warnBox = document.getElementById('bulkWarnings');
   if(warnings.length > 0){
