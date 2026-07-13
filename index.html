@@ -304,6 +304,14 @@
   .field.invalid .ferr{ display:block; }
   .modal-actions{ display:flex; gap:10px; margin-top:18px; }
   .modal-actions .btn{ flex:1; }
+  .admin-delete-zone{
+    margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); text-align:center;
+  }
+  .btn-danger-outline{
+    background:transparent; color:var(--danger); border:1px solid var(--danger-bg);
+    width:100%; margin-bottom:6px;
+  }
+  .btn-danger-outline:hover{ background:var(--danger-bg); }
   .btn-cancel{ background:var(--gray-bg); color:var(--ink); }
 
   /* ===== Export bar ===== */
@@ -632,6 +640,11 @@
       <div class="modal-actions">
         <button class="btn btn-cancel" onclick="closeModal()">Hủy</button>
         <button class="btn btn-primary" id="btnSaveStatus" onclick="saveStatus()">Lưu cập nhật</button>
+      </div>
+
+      <div class="admin-delete-zone" id="adminDeleteZone" style="display:none;">
+        <button class="btn btn-danger-outline" onclick="deleteTask()">🗑 Xóa hẳn nhiệm vụ này</button>
+        <div class="fhint">Chỉ Admin thấy được nút này. Xóa xong sẽ mất hẳn, không khôi phục được.</div>
       </div>
     </div>
   </div>
@@ -1094,12 +1107,40 @@ function openModalByCode(code){
   document.getElementById('mMoTa').value = t.mo_ta || '';
   clearValidation();
   toggleProof();
+  document.getElementById('adminDeleteZone').style.display = state.adminUnlocked ? 'block' : 'none';
   document.getElementById('modalOverlay').classList.add('show');
 }
 
 function closeModal(){
   document.getElementById('modalOverlay').classList.remove('show');
   state.currentEditCode = null;
+}
+
+async function deleteTask(){
+  const code = state.currentEditCode;
+  if(!code) return;
+
+  const ok = confirm(`Xóa hẳn nhiệm vụ "${code}" khỏi hệ thống?\n\nSẽ mất hẳn, không khôi phục được — không phải chuyển sang trạng thái nào cả.`);
+  if(!ok) return;
+
+  // Xóa ngay khỏi giao diện (không chờ Sheet) — khôi phục lại nếu lỡ xóa thất bại
+  const idx = state.tasks.findIndex(x => x.so_ky_hieu === code);
+  const removed = idx > -1 ? state.tasks[idx] : null;
+  if(idx > -1) state.tasks.splice(idx, 1);
+  renderAll();
+  closeModal();
+  showToast('Đã xóa nhiệm vụ');
+
+  if(!WEBAPP_URL) return; // chế độ demo, không có Sheet thật
+
+  try{
+    const res = await callApi({ action:'delete_task', so_ky_hieu: code });
+    if(res.status !== 'ok') throw new Error(res.message || 'Lỗi không xác định');
+  }catch(err){
+    if(removed) state.tasks.splice(idx, 0, removed);
+    renderAll();
+    showToast('Xóa thất bại, đã khôi phục lại: ' + err.message, true);
+  }
 }
 
 function toggleProof(){
