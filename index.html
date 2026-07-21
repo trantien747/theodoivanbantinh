@@ -534,6 +534,7 @@
               <option>Văn phòng HĐND-UBND</option>
               <option>Trung tâm cung ứng dịch vụ sự nghiệp công</option>
               <option>Trạm Y tế</option>
+              <option>Ban Quản lý dự án đầu tư xây dựng</option>
             </select>
           </div>
           <div>
@@ -763,6 +764,7 @@ const DEPARTMENTS = [
   'Phòng Kinh tế', 'Phòng Văn hóa – Xã hội', 'Trung tâm Phục vụ hành chính công',
   'Công an xã', 'Ban Chỉ huy Quân sự xã', 'Văn phòng HĐND-UBND',
   'Trung tâm cung ứng dịch vụ sự nghiệp công', 'Trạm Y tế',
+  'Ban Quản lý dự án đầu tư xây dựng',
 ];
 
 // Mỗi phòng ban 1 màu riêng để dễ phân biệt trực quan — cố tình tránh tông đỏ/hồng
@@ -776,6 +778,7 @@ const DEPT_COLORS = {
   'Văn phòng HĐND-UBND': '#1C2A44',
   'Trung tâm cung ứng dịch vụ sự nghiệp công': '#8A6D3B',
   'Trạm Y tế': '#2B8C93',
+  'Ban Quản lý dự án đầu tư xây dựng': '#8C6E1E',
   '(Chưa gán phòng)': '#9B948A',
 };
 const DEPT_COLOR_FALLBACK = '#6B6459';
@@ -789,6 +792,7 @@ const DEPT_SHORT = {
   'Văn phòng HĐND-UBND': 'Văn phòng',
   'Trung tâm cung ứng dịch vụ sự nghiệp công': 'DVSNC',
   'Trạm Y tế': 'Y tế',
+  'Ban Quản lý dự án đầu tư xây dựng': 'BQL ĐTXD',
   '(Chưa gán phòng)': 'Chưa gán',
 };
 
@@ -1452,6 +1456,15 @@ const DEPT_ALIASES = [
   { name: 'Ban Chỉ huy Quân sự xã', patterns: [/qu[âa]n\s*s[ựu]/i, /\bchqs\b/i] },
   { name: 'Văn phòng HĐND-UBND', patterns: [/v[ăa]n\s*ph[òo]ng/i] },
   { name: 'Trạm Y tế', patterns: [/tr[ạa]m\s*y\s*t[eế]/i, /\btyt\b/i] },
+  // Nhiều kiểu viết tắt khác nhau anh em hay dùng: "ban quản lý da", "ban qlda",
+  // "ban qlda đtxd", "bqlda", "qlda"... đều phải nhận ra đúng 1 đơn vị này.
+  { name: 'Ban Quản lý dự án đầu tư xây dựng', patterns: [
+    /ban\s*qu[ảa]n\s*l[ýy]\s*d[ựu]\s*[áa]n(\s*(đ[ầa]u\s*t[uư]\s*x[âa]y\s*d[ựu]ng|đtxd))?/i, // Ban quản lý dự án (đầu tư xây dựng / ĐTXD)
+    /ban\s*qu[ảa]n\s*l[ýy]\s*da\b/i,                                                 // Ban quản lý da
+    /ban\s*qlda(\s*[-–]?\s*đtxd)?/i,                                                 // Ban QLDA / Ban QLDA ĐTXD
+    /\bbqlda\b/i,                                                                    // BQLDA
+    /\bqlda\b/i,                                                                     // QLDA
+  ]},
 ];
 
 // Trả về { donVi: tên chuẩn, note: phần chữ còn dư (ghi chú gốc, không mất dữ liệu) }
